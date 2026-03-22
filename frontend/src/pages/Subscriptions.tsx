@@ -1,19 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Trash2 } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 
 export function Subscriptions() {
   const [subs, setSubs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ url: '', secret: '', event_types: '' });
+  const [submitting, setSubmitting] = useState(false);
 
   const loadSubs = async () => {
     try {
@@ -32,6 +27,7 @@ export function Subscriptions() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       const payload = {
         url: formData.url,
@@ -40,16 +36,18 @@ export function Subscriptions() {
       };
       await api.createSubscription(payload);
       toast.success('Subscription created');
-      setOpen(false);
-      loadSubs();
+      setShowForm(false);
       setFormData({ url: '', secret: '', event_types: '' });
+      loadSubs();
     } catch (err) {
       toast.error('Creation failed');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure?')) return;
+    if (!confirm('Delete this subscription?')) return;
     try {
       await api.deleteSubscription(id);
       toast.success('Deleted successfully');
@@ -61,89 +59,208 @@ export function Subscriptions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Page Header */}
+      <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Subscriptions</h2>
-          <p className="text-muted-foreground mt-1">Manage where webhooks are delivered.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: '#191c1e' }}>Subscriptions</h1>
+          <p className="text-sm mt-1" style={{ color: '#515f74' }}>Manage webhook endpoints and delivery targets.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button className="bg-primary text-primary-foreground" />}>
-            <Plus className="w-4 h-4 mr-2" /> Add Endpoint
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Add Webhook Subscription</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label htmlFor="url">Endpoint URL</Label>
-                <Input id="url" type="url" required placeholder="https://api.example.com/webhook" 
-                  value={formData.url} onChange={e => setFormData({ ...formData, url: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="secret">Secret (Optional)</Label>
-                <Input id="secret" type="password" placeholder="Leave empty to auto-generate" 
-                  value={formData.secret} onChange={e => setFormData({ ...formData, secret: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="events">Event Types (comma separated)</Label>
-                <Input id="events" placeholder="order.created, payment.failed" 
-                  value={formData.event_types} onChange={e => setFormData({ ...formData, event_types: e.target.value })} />
-              </div>
-              <Button type="submit" className="w-full">Save Subscription</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <button
+          onClick={() => setShowForm(v => !v)}
+          className="flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase tracking-wide text-white transition-all active:scale-95 shadow-sm hover:opacity-90"
+          style={{ backgroundColor: '#00488d' }}
+        >
+          <span className="material-symbols-outlined text-sm">add</span>
+          New Subscription
+        </button>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
-          {[1,2,3].map(i => <div key={i} className="h-48 bg-white/5 rounded-xl border border-white/5" />)}
-        </div>
-      ) : subs.length === 0 ? (
-        <div className="text-center py-24 border border-dashed border-white/10 rounded-xl">
-          <p className="text-muted-foreground">No subscriptions configured yet.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {subs.map(sub => (
-            <Card key={sub.id} className="shadow-sm flex flex-col relative group">
-              <CardHeader className="pb-3 text-sm">
-                <div className="flex justify-between items-start">
-                  <CardTitle className="truncate pr-4 text-primary max-w-full font-mono text-xs" title={sub.url}>
-                    {sub.url}
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    {sub.event_types?.length > 0 ? (
-                      sub.event_types.map((e: string) => (
-                        <Badge key={e} variant="secondary" className="bg-purple-500/10 text-purple-500 border-purple-500/20">{e}</Badge>
-                      ))
-                    ) : (
-                      <Badge variant="outline" className="text-muted-foreground border-white/10">All events</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-4">
-                    <span className="text-xs text-muted-foreground">Status:</span>
-                    <Badge variant="outline" className={sub.status === 'active' ? "text-green-500 border-green-500/20 bg-green-500/10" : "text-yellow-500 border-yellow-500/20 bg-yellow-500/10"}>
-                      {sub.status}
-                    </Badge>
-                  </div>
-                </div>
-                
-                <div className="mt-6 pt-4 border-t border-white/5 flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive" onClick={() => handleDelete(sub.id)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      {/* Inline Add Form */}
+      {showForm && (
+        <div
+          className="rounded-xl p-6 shadow-sm"
+          style={{ backgroundColor: '#ffffff', border: '1px solid rgba(194,198,212,0.3)' }}
+        >
+          <h3 className="text-sm font-bold mb-4 flex items-center gap-2" style={{ color: '#191c1e' }}>
+            <span className="material-symbols-outlined text-lg" style={{ color: '#00488d' }}>webhook</span>
+            Add Webhook Endpoint
+          </h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest block mb-1.5" style={{ color: '#515f74' }}>
+                  Endpoint URL *
+                </label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://api.example.com/webhook"
+                  value={formData.url}
+                  onChange={e => setFormData({ ...formData, url: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg text-sm border-none outline-none focus:ring-1"
+                  style={{ backgroundColor: '#f2f4f6', color: '#191c1e' }}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest block mb-1.5" style={{ color: '#515f74' }}>
+                  Secret (optional)
+                </label>
+                <input
+                  type="password"
+                  placeholder="Leave empty to auto-generate"
+                  value={formData.secret}
+                  onChange={e => setFormData({ ...formData, secret: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg text-sm border-none outline-none focus:ring-1"
+                  style={{ backgroundColor: '#f2f4f6', color: '#191c1e' }}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest block mb-1.5" style={{ color: '#515f74' }}>
+                Event Types (comma separated)
+              </label>
+              <input
+                type="text"
+                placeholder="order.created, payment.failed, user.updated"
+                value={formData.event_types}
+                onChange={e => setFormData({ ...formData, event_types: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg text-sm border-none outline-none focus:ring-1"
+                style={{ backgroundColor: '#f2f4f6', color: '#191c1e' }}
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-5 py-2 rounded text-xs font-bold uppercase tracking-wide text-white transition-all active:scale-95 disabled:opacity-60"
+                style={{ backgroundColor: '#00488d' }}
+              >
+                {submitting ? 'Saving...' : 'Save Subscription'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-5 py-2 rounded text-xs font-bold uppercase tracking-wide transition-all active:scale-95"
+                style={{ backgroundColor: '#eceef0', color: '#515f74' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
       )}
+
+      {/* Subscriptions Table */}
+      <div
+        className="rounded-xl shadow-sm overflow-hidden"
+        style={{ backgroundColor: '#ffffff', border: '1px solid rgba(194,198,212,0.15)' }}
+      >
+        <div
+          className="px-6 py-4 flex justify-between items-center"
+          style={{ borderBottom: '1px solid rgba(194,198,212,0.2)' }}
+        >
+          <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: '#191c1e' }}>
+            <span className="material-symbols-outlined text-lg" style={{ color: '#00488d' }}>list_alt</span>
+            Active Endpoints
+          </h2>
+          <span className="text-xs" style={{ color: '#515f74' }}>{subs.length} subscription{subs.length !== 1 ? 's' : ''}</span>
+        </div>
+
+        {loading ? (
+          <div className="p-8 space-y-3 animate-pulse">
+            {[1,2,3].map(i => <div key={i} className="h-12 rounded" style={{ backgroundColor: '#e0e3e5' }} />)}
+          </div>
+        ) : subs.length === 0 ? (
+          <div className="text-center py-16">
+            <span className="material-symbols-outlined text-5xl block mx-auto mb-3" style={{ color: '#c2c6d4' }}>webhook</span>
+            <p className="text-sm font-medium mb-1" style={{ color: '#191c1e' }}>No subscriptions yet</p>
+            <p className="text-xs" style={{ color: '#515f74' }}>Add your first webhook endpoint to start receiving deliveries.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow style={{ backgroundColor: 'rgba(242,244,246,0.5)' }}>
+                  <TableHead className="px-6 py-3 text-[10px] font-extrabold uppercase tracking-widest" style={{ color: '#515f74' }}>Endpoint URL</TableHead>
+                  <TableHead className="px-6 py-3 text-[10px] font-extrabold uppercase tracking-widest" style={{ color: '#515f74' }}>Event Types</TableHead>
+                  <TableHead className="px-6 py-3 text-[10px] font-extrabold uppercase tracking-widest" style={{ color: '#515f74' }}>Status</TableHead>
+                  <TableHead className="px-6 py-3 text-[10px] font-extrabold uppercase tracking-widest" style={{ color: '#515f74' }}>ID</TableHead>
+                  <TableHead className="px-6 py-3"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {subs.map((sub) => (
+                  <TableRow
+                    key={sub.id}
+                    className="transition-colors group"
+                    style={{ borderBottom: '1px solid rgba(194,198,212,0.12)' }}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f2f4f6')}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}
+                  >
+                    <TableCell className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm" style={{ color: '#00488d' }}>link</span>
+                        <span className="font-mono text-xs truncate max-w-[280px]" style={{ color: '#00488d' }} title={sub.url}>
+                          {sub.url}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {sub.event_types?.length > 0 ? (
+                          sub.event_types.slice(0, 3).map((e: string) => (
+                            <span
+                              key={e}
+                              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                              style={{ backgroundColor: '#d5e3fc', color: '#00488d' }}
+                            >
+                              {e}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[10px] font-medium" style={{ color: '#515f74' }}>All events</span>
+                        )}
+                        {sub.event_types?.length > 3 && (
+                          <span className="text-[10px] font-medium" style={{ color: '#515f74' }}>+{sub.event_types.length - 3} more</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      <div className="flex items-center gap-1.5">
+                        <div
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{
+                            backgroundColor: sub.status === 'active' ? '#00488d' : '#ba1a1a',
+                            boxShadow: sub.status === 'active' ? '0 0 8px rgba(0,72,141,0.5)' : '0 0 8px rgba(186,26,26,0.5)',
+                          }}
+                        />
+                        <span
+                          className="text-xs font-semibold capitalize"
+                          style={{ color: sub.status === 'active' ? '#00488d' : '#ba1a1a' }}
+                        >
+                          {sub.status}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      <span className="font-mono text-[10px]" style={{ color: '#515f74' }}>{sub.id.substring(0, 8)}</span>
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => handleDelete(sub.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded transition-all hover:bg-red-50"
+                        title="Delete subscription"
+                      >
+                        <span className="material-symbols-outlined text-sm" style={{ color: '#ba1a1a' }}>delete</span>
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
